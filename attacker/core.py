@@ -33,8 +33,9 @@ SERVER = (my_ip, my_port)
 target_ip = None 
 target_port = None 
 
-# CVC Config: 36 bytes (30 data + 6 header)
-chunk_size = 36 
+# CVC Config: 13 bytes max (7 data + 6 header)
+# Constraint: max 12 CVCs → 3 labels of ≤14 chars → 5 total depth
+chunk_size = 13 
 delay = args.delay
 received_chunk_size = args.received_chunks
 buffer_size = args.buffer

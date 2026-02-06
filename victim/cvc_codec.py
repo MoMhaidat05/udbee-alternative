@@ -57,22 +57,32 @@ def encode_bytes_to_domain(raw_data: bytes) -> str:
         
     cvc_list.reverse()
     
-    # --- Pack all CVC syllables into exactly 2 data labels ---
-    # Target: {keyword}.{data1}.{data2}.{tld} = 4 labels (depth ~3.3)
-    all_cvc = "".join(cvc_list)
-    total_syls = len(cvc_list)
+    # --- Dynamic label packing with hard constraints ---
+    # Max 4 CVCs per label (4×3 = 12 chars, within 14-char cap)
+    # Max 3 data labels (keyword + 3 data + tld = 5 labels max)
+    MAX_CVC_PER_LABEL = 4
+    MAX_DATA_LABELS = 3
     
-    if total_syls <= 2:
-        # Very small payload: single data label
-        data_labels = [all_cvc]
-    else:
-        # Variable split point for length variance (anti-fingerprinting)
-        mid = total_syls // 2
-        lo = max(1, mid - 2)
-        hi = min(total_syls - 1, mid + 2)
-        split_syl = random.randint(lo, hi)
-        split_char = split_syl * 3
-        data_labels = [all_cvc[:split_char], all_cvc[split_char:]]
+    n = len(cvc_list)
+    data_labels = []
+    idx = 0
+    labels_left = MAX_DATA_LABELS
+    
+    while idx < n and labels_left > 0:
+        remaining_cvcs = n - idx
+        if labels_left == 1:
+            # Last slot: take everything remaining (capped at 4)
+            take = min(remaining_cvcs, MAX_CVC_PER_LABEL)
+        else:
+            # Ensure remaining CVCs can still fit in remaining labels
+            min_take = max(1, remaining_cvcs - (labels_left - 1) * MAX_CVC_PER_LABEL)
+            max_take = min(MAX_CVC_PER_LABEL, remaining_cvcs)
+            take = random.randint(min_take, max_take)
+        
+        label = "".join(cvc_list[idx:idx + take])
+        data_labels.append(label)
+        idx += take
+        labels_left -= 1
     
     keyword = random.choice(INFRA_KEYWORDS)
     tld = random.choice(SAFE_TLDS)
