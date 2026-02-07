@@ -99,31 +99,23 @@ def _is_valid_cvc(s: str) -> bool:
     return s[0] in C_START and s[1] in VOWELS and s[2] in C_END
 
 
-def decode_domain_to_bytes(domain_string: str, debug=False) -> bytes:
+def decode_domain_to_bytes(domain_string: str) -> bytes:
     """
     Decodes a CVC domain back to bytes.
     Identifies data labels purely by CVC pattern matching — no delimiters needed.
     Noise labels (2-char, digits, non-CVC) are automatically filtered out.
     """
     clean_parts = domain_string.lower().split('.')
-    
-    if debug:
-        print(f"[DEBUG] clean_parts: {clean_parts}")
-    
+
     syllables = []
-    
+
     for part in clean_parts:
-        # Skip ignored words (safety net)
         if part in IGNORE_WORDS:
-            if debug: print(f"[DEBUG] Skipping ignored: {part}")
             continue
-        
-        # Skip parts that aren't multiples of 3 (can't contain complete CVCs)
+
         if len(part) == 0 or len(part) % 3 != 0:
-            if debug: print(f"[DEBUG] Skipping non-mod3: {part} (len={len(part)})")
             continue
-            
-        # Extract CVC syllables from this part
+
         all_valid = True
         part_syllables = []
         for i in range(0, len(part), 3):
@@ -132,24 +124,17 @@ def decode_domain_to_bytes(domain_string: str, debug=False) -> bytes:
                 part_syllables.append(sub)
             else:
                 all_valid = False
-                if debug: print(f"[DEBUG] Invalid CVC or ignored: {sub}")
                 break
-        
-        # Only include labels where ALL triplets are valid CVC
+
         if all_valid and part_syllables:
             syllables.extend(part_syllables)
-    
-    if debug:
-        print(f"[DEBUG] syllables: {syllables}")
-    
+
     if not syllables:
         return b""
 
-    # Reconstruct the integer from syllables
-    # Syllables are in MSB-first order (encoder reversed them), so process left-to-right
     huge_int = 0
-    
-    for syl in syllables:  # NO reverse - domain order is already MSB first
+
+    for syl in syllables:
         try:
             idx_start = C_START.index(syl[0])
             idx_vow = VOWELS.index(syl[1])
@@ -157,31 +142,20 @@ def decode_domain_to_bytes(domain_string: str, debug=False) -> bytes:
             val_10bit = (idx_start * 90) + (idx_vow * 15) + idx_end
             huge_int = (huge_int << 10) | val_10bit
         except ValueError:
-            continue 
+            continue
 
-    # Convert integer to bytes - use minimum bytes needed (no padding)
     if huge_int == 0:
         return b""
-    
-    # Calculate minimum bytes needed for the integer
+
     byte_length = (huge_int.bit_length() + 7) // 8
     decoded_with_length = huge_int.to_bytes(byte_length, 'big')
-    
-    if debug:
-        print(f"[DEBUG] huge_int hex: {hex(huge_int)}")
-        print(f"[DEBUG] byte_length: {byte_length}")
-        print(f"[DEBUG] decoded_with_length: {decoded_with_length.hex()}")
-    
-    # Length byte is at the END, random prefix (+ optional padding) at the start
+
     if len(decoded_with_length) < 2:
         return b""
-    
+
     original_length = decoded_with_length[-1]
     if original_length == 0 or len(decoded_with_length) < original_length + 2:
         return b""
     original_data = decoded_with_length[-(original_length + 1):-1]
-    
-    if debug:
-        print(f"[DEBUG] length (from tail): {original_length}, returning {len(original_data)} bytes")
-    
+
     return original_data
