@@ -110,7 +110,8 @@ def send_msg(message, is_cached: bool):
         payload_bytes = encryption_result["message"]
 
         chunks = dns_message(payload_bytes, chunk_size)
-        sent_chunks = {}
+        if is_cached:
+            sent_chunks = {}
         for i, chunk in enumerate(chunks):
             if is_cached:
                 sent_chunks[i] = chunk
@@ -151,7 +152,7 @@ def timeout_checker():
                             received_chunks.pop(current_session_id, None)
                             continue
 
-                        if expected_chunks and current_buffer and len(current_buffer) > 0 and (time.time() - last_received_time) > 1.5:
+                        if expected_chunks and current_buffer and len(current_buffer) > 0 and (time.time() - last_received_time) > 0.5:
                             missing_packets = check_missing_packets(current_buffer, expected_chunks)
                             if missing_packets:
                                 log_warn(f"Requesting {len(missing_packets)} missing packets...")
@@ -159,7 +160,8 @@ def timeout_checker():
                                 total_missing_packets += len(missing_packets)
                                 send_msg(f"RESEND:{','.join(str(i) for i in missing_packets)}", False)
                                 resends_requests += 1
-                                time.sleep(1)
+                                last_received_time = time.time()
+                                time.sleep(0.5 + resends_requests * 0.5)
                                 continue
                     except Exception:
                         pass

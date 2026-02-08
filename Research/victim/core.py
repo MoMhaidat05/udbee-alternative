@@ -53,7 +53,8 @@ def send_msg(message, is_cached):
         if not result.get("success"):
             return
         chunks = dns_message(result["message"], CHUNK_SIZE)
-        sent_chunks = {}
+        if is_cached:
+            sent_chunks = {}
         for i, chunk in enumerate(chunks):
             if is_cached:
                 sent_chunks[i] = chunk
@@ -68,18 +69,19 @@ def timeout_checker():
     while True:
         try:
             if last_received_time is not None:
-                if resends_requests < 3:
+                if resends_requests < 6:
                     try:
                         if received_chunks:
                             sid = next(iter(received_chunks))
                             buf = received_chunks[sid]["chunks"]
                             expected_chunks = received_chunks[sid]["total"]
-                            if expected_chunks and buf and (time.time() - last_received_time) > 3:
+                            if expected_chunks and buf and (time.time() - last_received_time) > 0.5:
                                 missing = check_missing_packets(buf, expected_chunks)
                                 if missing:
                                     send_msg(f"RESEND:{','.join(str(i) for i in missing)}", False)
                                     resends_requests += 1
-                                    time.sleep(5)
+                                    last_received_time = time.time()
+                                    time.sleep(0.5 + resends_requests * 0.5)
                                     continue
                     except Exception:
                         pass
@@ -194,7 +196,7 @@ def core():
                                     idx = int(idx)
                                     if idx in sent_chunks:
                                         sock.sendto(sent_chunks[idx], SERVER)
-                                        time.sleep(0.05)
+                                        time.sleep(0.01)
                                 except Exception:
                                     pass
                         else:
